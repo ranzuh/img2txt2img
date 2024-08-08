@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 import os
 import requests
 import io
@@ -6,11 +5,13 @@ from PIL import Image
 import base64
 
 
-load_dotenv()
 hf_api_key = os.getenv("API_KEY")
 sai_api_key = os.getenv("STABILITY_API_KEY")
 
 def generate_caption(img_fname):
+    if hf_api_key is None:
+        raise Exception("Missing HuggingFace API key.")
+    
     API_URL = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large"
     headers = {"Authorization": f"Bearer {hf_api_key}"}
 
@@ -22,7 +23,9 @@ def generate_caption(img_fname):
     return output[0]["generated_text"]
 
 def generate_image_SDXL_free(prompt):
-
+    if hf_api_key is None:
+        raise Exception("Missing HuggingFace API key.")
+    
     API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
     headers = {"Authorization": f"Bearer {hf_api_key}"}
     payload = {"inputs": prompt}
