@@ -1,2 +1,10 @@
 .env
 *.jpg
+*.ipynb
+.ipynb_checkpoints
+gens
+uploads
+*.png
+*.jpeg
+*.pyc
+.sesskey

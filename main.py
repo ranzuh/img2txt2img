@@ -1,11 +1,12 @@
 from fasthtml.common import *
-from PIL import Image
+from PIL import Image, ImageOps
 from io import BytesIO
-from apis import generate_caption, generate_image_SDXL_free, generate_image_SDXL_paid
+from apis import generate_caption_free, generate_image_SDXL_free, generate_image_SDXL_paid, openai_caption
 import os
 
 paid = False
 generate_image = generate_image_SDXL_paid if paid else generate_image_SDXL_free
+generate_caption = openai_caption if paid else generate_caption_free
 
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("gens", exist_ok=True)
@@ -15,9 +16,8 @@ gen_images = os.listdir("gens")
 
 css = Style(
 """
-body { padding: 2rem; }
-.container { max-width: 800px; margin: 0 auto; }
-img { margin-bottom: 1rem; }
+.container { max-width: 800px; margin: 0 auto; padding: 10px;}
+img { margin-bottom: 1rem; max-height: 800px; }
 """)
 
 aria_busy_args = dict(hx_on__before_request="this.setAttribute('aria-busy', 'true')",
@@ -27,7 +27,8 @@ app, rt = fast_app(hdrs=[picolink, css])
 
 @app.get("/")
 def home():
-    return Titled("Image generation App", ImageUpload(), Div(id="captionsection"), Div(id="gensection"), id="home")
+    return Titled("Image Generation App", P("Generate new images based on your images! To begin, upload any image you want to use as a reference. Currently only supports images in JPG format."),
+                  ImageUpload(), Div(id="captionsection"), Div(id="gensection"), id="home")
 
 def ImageUpload(): 
     return Article(
@@ -57,19 +58,20 @@ def GeneratedImage(fname):
 async def upload(imageup: UploadFile):
     bytes = await imageup.read()
     img = Image.open(BytesIO(bytes))
+    img = img.convert('RGB') # JPG does not support RGBA
+    img.thumbnail((1024, 1024))
+    img = ImageOps.exif_transpose(img) # Fix image rotation based on exif metadata
     fname = f"uploads/{len(images)+1}.jpg"
     images.append(fname)
     img.save(fname)
     return Figure(Img(id="preview-image", src=fname, alt="preview image")), Button(
         "Generate Caption", hx_get=f"/gencaption/{len(images)}", hx_target="#captionsection", **aria_busy_args)
 
-@threaded
 @app.get("/gencaption/{id}")
 def get_caption_gen(id: str):
     caption = generate_caption(f"uploads/{id}.jpg")
     return GeneratedCaption(caption)
 
-@threaded
 @app.post("/genimage")
 def get_image_gen(captiontext: str):
     gen_image = generate_image(captiontext)

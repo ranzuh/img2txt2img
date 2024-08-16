@@ -3,12 +3,11 @@ import requests
 import io
 from PIL import Image
 import base64
+import requests
 
 
-hf_api_key = os.getenv("API_KEY")
-sai_api_key = os.getenv("STABILITY_API_KEY")
-
-def generate_caption(img_fname):
+def generate_caption_free(img_fname):
+    hf_api_key = os.getenv("API_KEY")
     if hf_api_key is None:
         raise Exception("Missing HuggingFace API key.")
     
@@ -20,9 +19,11 @@ def generate_caption(img_fname):
     response = requests.post(API_URL, headers=headers, data=data)
 
     output = response.json()
+    print(output)
     return output[0]["generated_text"]
 
 def generate_image_SDXL_free(prompt):
+    hf_api_key = os.getenv("API_KEY")
     if hf_api_key is None:
         raise Exception("Missing HuggingFace API key.")
     
@@ -34,6 +35,7 @@ def generate_image_SDXL_free(prompt):
     return Image.open(io.BytesIO(img_bytes))
 
 def generate_image_SDXL_paid(prompt):
+    sai_api_key = os.getenv("STABILITY_API_KEY")
     if sai_api_key is None:
         raise Exception("Missing Stability API key.")
 
@@ -55,3 +57,48 @@ def generate_image_SDXL_paid(prompt):
 
     data = response.json()
     return Image.open(io.BytesIO(base64.b64decode(data["artifacts"][0]["base64"])))
+
+def openai_caption(img_fname):
+    # OpenAI API Key
+    oai_api_key = os.getenv("OPENAI_API_KEY")
+
+    # Function to encode the image
+    def encode_image(image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+
+
+    # Getting the base64 string
+    base64_image = encode_image(img_fname)
+
+    headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {oai_api_key}"
+    }
+
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {
+            "role": "user",
+            "content": [
+                {
+                "type": "text",
+                "text": "What's in this image?"
+                },
+                {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}",
+                    "detail": "low"
+                }
+                }
+            ]
+            }
+        ],
+        "max_tokens": 300
+    }
+
+    response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+
+    return response.json()["choices"][0]["message"]["content"]
